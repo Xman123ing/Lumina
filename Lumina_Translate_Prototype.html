@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumina Translate - UI Prototype</title>
+    <style>
+        :root {
+            --bg-glass: rgba(30, 30, 35, 0.65);
+            --bg-glass-hover: rgba(50, 50, 55, 0.75);
+            --border-glass: rgba(255, 255, 255, 0.12);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --accent-color: #8b5cf6;
+            --accent-hover: #7c3aed;
+            --ai-gradient: linear-gradient(135deg, #8b5cf6, #ec4899);
+            --ai-gradient-hover: linear-gradient(135deg, #7c3aed, #db2777);
+            --sidebar-width: 220px;
+            --window-radius: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* macOS Monterey Graphic Wallpaper */
+            background: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop') no-repeat center center fixed;
+            background-size: cover;
+            overflow: hidden;
+            color: var(--text-primary);
+        }
+
+        /* Main App Window */
+        .mac-window {
+            width: 900px;
+            height: 600px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--window-radius);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+            animation: windowAppear 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes windowAppear {
+            0% { opacity: 0; transform: scale(0.95) translateY(20px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* macOS Window Controls */
+        .window-controls {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .control-btn {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: none;
+        }
+        .close { background: #ff5f56; }
+        .minimize { background: #ffbd2e; }
+        .maximize { background: #27c93f; }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: rgba(20, 20, 25, 0.4);
+            border-right: 1px solid var(--border-glass);
+            padding: 60px 12px 20px;
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), padding 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            padding-left: 0;
+            padding-right: 0;
+            border-right: none;
+            opacity: 0;
+        }
+
+        .app-brand {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            padding-left: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-item {
+            padding: 10px 12px;
+            margin-bottom: 4px;
+            border-radius: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .nav-item svg {
+            width: 16px;
+            height: 16px;
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
+
+        .spacer { flex-grow: 1; }
+
+        /* Main Content Area */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-width: 0;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 12px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            gap: 16px;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .sidebar-toggle-btn {
+            position: absolute;
+            left: 80px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .mode-tabs {
+            display: flex;
+            position: relative;
+            background: linear-gradient(180deg, rgba(40, 40, 45, 0.78), rgba(24, 24, 28, 0.72));
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 5px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow:
+                0 10px 30px rgba(0, 0, 0, 0.28),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+                0 0 24px rgba(139, 92, 246, 0.18);
+            isolation: isolate;
+        }
+
+        .mode-slider {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            height: calc(100% - 10px);
+            width: 138px;
+            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.16));
+            box-shadow:
+                0 6px 16px rgba(0, 0, 0, 0.22),
+                0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+            transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.25s ease;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .mode-tabs::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: -14px;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 20px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.45) 0%, rgba(139, 92, 246, 0) 75%);
+            pointer-events: none;
+        }
+
+        .tab-btn {
+            padding: 7px 18px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 550;
+            letter-spacing: 0.2px;
+            transition: all 0.22s;
+            min-width: 138px;
+            position: relative;
+            z-index: 1;
+            transform-origin: center center;
+            will-change: transform;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .tab-btn.active {
+            color: var(--text-primary);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.18);
+        }
+
+        .tab-btn.is-pressing {
+            transform: scale(0.96);
+            transition: transform 0.1s ease-out;
+        }
+
+        .tab-btn.bounce {
+            animation: tabBounce 0.34s cubic-bezier(0.2, 0.9, 0.15, 1.2);
+        }
+
+        @keyframes tabBounce {
+            0% { transform: scale(0.96); }
+            42% { transform: scale(1.04); }
+            100% { transform: scale(1); }
+        }
+
+        /* Views */
+        .view-container {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            padding: 24px;
+            overflow-y: auto;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .view-container.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Dictionary View (Default) */
+        .search-box {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .search-box input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 16px 20px 16px 48px;
+            color: var(--text-primary);
+            font-size: 18px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .search-box svg {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+
+        .dict-results {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 12px;
+            padding: 24px;
+            flex: 1;
+            border: 1px solid var(--border-glass);
+        }
+
+        .word-title {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .phonetic {
+            color: var(--accent-color);
+            font-size: 16px;
+            font-weight: 400;
+            font-family: monospace;
+        }
+
+        .phonetic-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 4px;
+        }
+
+        .phonetic-group {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .phonetic-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .def-list {
+            margin-top: 20px;
+            list-style: none;
+        }
+
+        .def-item {
+            margin-bottom: 16px;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .def-pos {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-right: 8px;
+        }
+
+        /* Text Translation View */
+        .translation-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            flex: 1;
+        }
+
+        .text-panel {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: border-color 0.3s;
+        }
+
+        .text-panel:focus-within {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 16px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+        }
+
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .output-text {
+            flex: 1;
+            font-size: 16px;
+            line-height: 1.5;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 16px;
+            background: var(--accent-color);
+            vertical-align: middle;
+            animation: blink 1s step-end infinite;
+            opacity: 0;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* Bottom Toolbar */
+        .toolbar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-glass);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .action-btn.primary {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+            font-weight: 500;
+        }
+
+        .action-btn.primary:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        /* AI Button */
+        .ai-btn {
+            background: var(--ai-gradient);
+            border: none;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+        }
+
+        .ai-btn:hover {
+            background: var(--ai-gradient-hover);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .ai-btn svg {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Quick Translate Overlay (Hidden by default) */
+        .quick-translate {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 200;
+        }
+
+        .quick-translate.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .qt-box {
+            width: 600px;
+            background: rgba(40, 40, 45, 0.85);
+            backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+            overflow: hidden;
+            transform: translateY(20px) scale(0.95);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .quick-translate.visible .qt-box {
+            transform: translateY(0) scale(1);
+        }
+
+        .qt-input {
+            width: 100%;
+            padding: 20px 24px;
+            font-size: 24px;
+            background: transparent;
+            border: none;
+            color: white;
+            outline: none;
+        }
+
+        .qt-input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Main Window -->
+    <div class="mac-window">
+        <div class="window-controls">
+            <div class="control-btn close"></div>
+            <div class="control-btn minimize"></div>
+            <div class="control-btn maximize"></div>
+        </div>
+
+        <!-- Sidebar (Collapsed by default) -->
+        <div class="sidebar collapsed" id="sidebar">
+            <div class="app-brand">Lumina Translate</div>
+            <div class="nav-item active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                Translate
+            </div>
+            <div class="nav-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                History
+            </div>
+            <div class="nav-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                Starred
+            </div>
+            <div class="spacer"></div>
+            <div class="nav-item" id="toggle-qt">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Quick Translate
+            </div>
+            <div class="nav-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Settings
+            </div>
+        </div>
+
+        <!-- Main Area -->
+        <div class="main-area">
+            <!-- Header -->
+            <div class="header">
+                <button class="icon-btn sidebar-toggle-btn" id="sidebar-toggle" title="Toggle Sidebar">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                
+                <div class="mode-tabs">
+                    <span class="mode-slider" id="mode-slider"></span>
+                    <button class="tab-btn active" data-target="dict-view">Dictionary</button>
+                    <button class="tab-btn" data-target="text-view">Text / Phrase</button>
+                </div>
+            </div>
+
+            <!-- View 1: Dictionary (Default) -->
+            <div id="dict-view" class="view-container active">
+                <div class="search-box">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="text" id="dict-search" placeholder="Search word or phrase in local dictionary...">
+                </div>
+                
+                <div class="dict-results" id="dict-results" style="display: none;">
+                    <div class="word-title">
+                        glassmorphism
+                    </div>
+                    <div class="phonetic-row">
+                        <div class="phonetic-group">
+                            <span class="phonetic-chip">US <span class="phonetic">[ˈɡlæs.mɔr.fɪ.zəm]</span></span>
+                            <span class="phonetic-chip">UK <span class="phonetic">[ˈɡlɑːs.mɔː.fɪ.zəm]</span></span>
+                        </div>
+                        <button class="icon-btn" id="dict-speak-btn" title="Pronounce">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                        </button>
+                    </div>
+                    
+                    <ul class="def-list">
+                        <li class="def-item">
+                            <span class="def-pos">n.</span>
+                            毛玻璃拟物化；一种 UI 设计风格，强调背景模糊（亚克力效果）、半透明和层次感。
+                        </li>
+                        <li class="def-item">
+                            <span class="def-pos">adj.</span>
+                            具有毛玻璃效果的。
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="toolbar">
+                    <button class="action-btn primary" id="dict-local-translate-btn">
+                        Local Translate
+                    </button>
+                    <button class="action-btn ai-btn" id="dict-ai-translate-btn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                        Ask AI (DeepSeek)
+                    </button>
+                </div>
+            </div>
+
+            <!-- View 2: Text / Phrase Translation -->
+            <div id="text-view" class="view-container">
+                <div class="translation-container">
+                    <div class="text-panel">
+                        <div class="panel-header">
+                            <span>Auto Detect</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span>0 / 5000</span>
+                                <button class="icon-btn" id="text-source-speak-btn" style="padding: 2px;" title="Read source">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <textarea id="source-text" placeholder="Enter phrase or long text to translate..."></textarea>
+                    </div>
+
+                    <div class="text-panel">
+                        <div class="panel-header">
+                            <span>Translation Result</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="icon-btn" id="text-result-speak-btn" style="padding: 2px;" title="Read translation"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg></button>
+                                <button class="icon-btn" style="padding: 2px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+                            </div>
+                        </div>
+                        <div class="output-text" id="output-text"></div>
+                        <div class="cursor" id="cursor"></div>
+                    </div>
+                </div>
+
+                <div class="toolbar">
+                    <button class="action-btn primary" id="local-translate-btn">
+                        Local Translate
+                    </button>
+                    <!-- Independent AI Button -->
+                    <button class="action-btn ai-btn" id="ai-translate-btn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                        Ask AI (DeepSeek)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Translate Overlay -->
+    <div class="quick-translate" id="qt-overlay">
+        <div class="qt-box">
+            <input type="text" class="qt-input" id="qt-input" placeholder="Quick translate (Local)...">
+        </div>
+    </div>
+
+    <script>
+        // Sidebar Toggle
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        // Tab Switching
+        const modeTabs = document.querySelector('.mode-tabs');
+        const modeSlider = document.getElementById('mode-slider');
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const views = document.querySelectorAll('.view-container');
+
+        const updateTabSlider = (activeBtn) => {
+            if (!modeTabs || !modeSlider || !activeBtn) return;
+            const tabsRect = modeTabs.getBoundingClientRect();
+            const btnRect = activeBtn.getBoundingClientRect();
+            const left = btnRect.left - tabsRect.left;
+            modeSlider.style.width = `${btnRect.width}px`;
+            modeSlider.style.transform = `translateX(${left}px)`;
+        };
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('pointerdown', () => {
+                btn.classList.add('is-pressing');
+            });
+            btn.addEventListener('pointerup', () => {
+                btn.classList.remove('is-pressing');
+            });
+            btn.addEventListener('pointerleave', () => {
+                btn.classList.remove('is-pressing');
+            });
+
+            btn.addEventListener('click', () => {
+                // Update active tab
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                btn.classList.remove('bounce');
+                void btn.offsetWidth;
+                btn.classList.add('bounce');
+                updateTabSlider(btn);
+
+                // Update active view
+                const targetId = btn.getAttribute('data-target');
+                views.forEach(view => {
+                    if (view.id === targetId) {
+                        view.classList.add('active');
+                    } else {
+                        view.classList.remove('active');
+                    }
+                });
+
+                window.setTimeout(() => {
+                    btn.classList.remove('bounce');
+                }, 360);
+            });
+        });
+
+        const initialActiveTab = document.querySelector('.tab-btn.active');
+        updateTabSlider(initialActiveTab);
+        window.addEventListener('resize', () => {
+            const activeBtn = document.querySelector('.tab-btn.active');
+            updateTabSlider(activeBtn);
+        });
+
+        // Dictionary Search Simulation
+        const dictSearch = document.getElementById('dict-search');
+        const dictResults = document.getElementById('dict-results');
+
+        dictSearch.addEventListener('input', (e) => {
+            if (e.target.value.trim().length > 0) {
+                dictResults.style.display = 'block';
+            } else {
+                dictResults.style.display = 'none';
+            }
+        });
+
+        // Translation Simulation
+        const localTranslateBtn = document.getElementById('local-translate-btn');
+        const aiTranslateBtn = document.getElementById('ai-translate-btn');
+        const dictLocalTranslateBtn = document.getElementById('dict-local-translate-btn');
+        const dictAiTranslateBtn = document.getElementById('dict-ai-translate-btn');
+        const sourceText = document.getElementById('source-text');
+        const outputText = document.getElementById('output-text');
+        const cursor = document.getElementById('cursor');
+        const dictSpeakBtn = document.getElementById('dict-speak-btn');
+        const textSourceSpeakBtn = document.getElementById('text-source-speak-btn');
+        const textResultSpeakBtn = document.getElementById('text-result-speak-btn');
+
+        const speak = (text, lang = 'en-US') => {
+            if (!text || !window.speechSynthesis) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang;
+            utterance.rate = 0.95;
+            utterance.pitch = 1;
+            window.speechSynthesis.speak(utterance);
+        };
+
+        const simulateTranslation = (response, isStream = false) => {
+            if (!sourceText.value.trim()) return;
+            
+            outputText.innerHTML = '';
+            cursor.style.opacity = '1';
+            
+            localTranslateBtn.disabled = true;
+            aiTranslateBtn.disabled = true;
+
+            if (isStream) {
+                // AI Stream Simulation
+                let i = 0;
+                const interval = setInterval(() => {
+                    outputText.innerHTML += response.charAt(i);
+                    i++;
+                    if (i >= response.length) {
+                        clearInterval(interval);
+                        cursor.style.opacity = '0';
+                        localTranslateBtn.disabled = false;
+                        aiTranslateBtn.disabled = false;
+                    }
+                }, 30);
+            } else {
+                // Local Instant Translation
+                setTimeout(() => {
+                    outputText.innerHTML = response;
+                    cursor.style.opacity = '0';
+                    localTranslateBtn.disabled = false;
+                    aiTranslateBtn.disabled = false;
+                }, 300);
+            }
+        };
+
+        localTranslateBtn.addEventListener('click', () => {
+            simulateTranslation("Lumina Translate 是一款原生应用。（来自本地离线词库）", false);
+        });
+
+        aiTranslateBtn.addEventListener('click', () => {
+            const aiResponse = "✨ Lumina Translate 是一款专为 macOS 设计的原生翻译应用，兼具离线词库查询与前沿 AI 大模型（DeepSeek、豆包、千问等）的长文翻译能力。\n\n它采用了极致的 Discord 风格 UI 设计，深度融合了 macOS 原生的毛玻璃（亚克力）效果，为您提供沉浸式的视觉体验。";
+            simulateTranslation(aiResponse, true);
+        });
+
+        dictLocalTranslateBtn.addEventListener('click', () => {
+            if (dictSearch.value.trim().length === 0) return;
+            dictResults.style.display = 'block';
+        });
+
+        dictAiTranslateBtn.addEventListener('click', () => {
+            if (dictSearch.value.trim().length === 0) return;
+            dictResults.style.display = 'block';
+            const aiExplain = document.createElement('div');
+            aiExplain.style.marginTop = '18px';
+            aiExplain.style.padding = '12px';
+            aiExplain.style.borderRadius = '10px';
+            aiExplain.style.background = 'rgba(139, 92, 246, 0.12)';
+            aiExplain.style.border = '1px solid rgba(139, 92, 246, 0.4)';
+            aiExplain.textContent = "AI 补充：在产品设计语境中，glassmorphism 通常强调半透明层、背景模糊、柔和阴影与分层对比，适合用于 macOS 风格界面。";
+            const existing = document.getElementById('dict-ai-explain');
+            if (existing) existing.remove();
+            aiExplain.id = 'dict-ai-explain';
+            dictResults.appendChild(aiExplain);
+        });
+
+        dictSpeakBtn.addEventListener('click', () => speak('glassmorphism', 'en-US'));
+        textSourceSpeakBtn.addEventListener('click', () => speak(sourceText.value, 'en-US'));
+        textResultSpeakBtn.addEventListener('click', () => speak(outputText.textContent, 'zh-CN'));
+
+        // Quick Translate Overlay Logic
+        const toggleQtBtn = document.getElementById('toggle-qt');
+        const qtOverlay = document.getElementById('qt-overlay');
+        const qtInput = document.getElementById('qt-input');
+
+        toggleQtBtn.addEventListener('click', () => {
+            qtOverlay.classList.add('visible');
+            qtInput.focus();
+        });
+
+        qtOverlay.addEventListener('click', (e) => {
+            if (e.target === qtOverlay) {
+                qtOverlay.classList.remove('visible');
+                qtInput.value = '';
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && qtOverlay.classList.contains('visible')) {
+                qtOverlay.classList.remove('visible');
+                qtInput.value = '';
+            }
+        });
+    </script>
+</body>
+</html>
