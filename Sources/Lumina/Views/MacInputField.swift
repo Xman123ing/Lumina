@@ -6,6 +6,7 @@ struct MacInputField: NSViewRepresentable {
     @Binding var text: String
     var placeholder: String
     var fontSize: CGFloat = 16
+    var inputTextColor: NSColor = .white
     var autoFocus: Bool = false
     var onSubmit: (() -> Void)? = nil
     var onUp: (() -> Void)? = nil
@@ -30,7 +31,7 @@ struct MacInputField: NSViewRepresentable {
         field.delegate = context.coordinator
         field.placeholderString = placeholder
         field.font = .systemFont(ofSize: fontSize, weight: .medium)
-        field.textColor = .white
+        field.textColor = inputTextColor
         logger.info("[LuminaInput] makeNSView placeholder=\(self.placeholder, privacy: .public)")
         return field
     }
@@ -43,14 +44,15 @@ struct MacInputField: NSViewRepresentable {
         }
         nsView.placeholderString = placeholder
         nsView.font = .systemFont(ofSize: fontSize, weight: .medium)
+        nsView.textColor = inputTextColor
 
         if autoFocus {
             if !context.coordinator.didAutoFocus {
-                context.coordinator.didAutoFocus = true
                 DispatchQueue.main.async {
                     self.logger.info("[LuminaInput] requesting focus placeholder=\(self.placeholder, privacy: .public)")
-                    nsView.window?.makeFirstResponder(nsView)
-                    if let editor = nsView.currentEditor() {
+                    let focusSucceeded = nsView.window?.makeFirstResponder(nsView) ?? false
+                    context.coordinator.didAutoFocus = focusSucceeded
+                    if focusSucceeded, let editor = nsView.currentEditor() {
                         editor.selectedRange = NSRange(location: nsView.stringValue.count, length: 0)
                     }
                     if let responder = nsView.window?.firstResponder {

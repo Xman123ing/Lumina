@@ -217,10 +217,13 @@ final class SQLiteDictionaryStore {
             for piece in expanded {
                 let cleaned = cleanDefinition(piece)
                 guard !cleaned.isEmpty else { continue }
-                if containsCJK(cleaned) {
-                    primary.append(cleaned)
-                } else {
-                    english.append(cleaned)
+                let splitLines = splitMixedPartOfSpeechLine(cleaned)
+                for splitLine in splitLines {
+                    if containsCJK(splitLine) {
+                        primary.append(splitLine)
+                    } else {
+                        english.append(splitLine)
+                    }
                 }
             }
         }
@@ -254,15 +257,23 @@ final class SQLiteDictionaryStore {
         text.range(of: #"\p{Han}"#, options: .regularExpression) != nil
     }
 
+    private var partOfSpeechPrefixes: [String] {
+        [
+            "n.", "v.", "vt.", "vi.", "adj.", "a.", "adv.", "ad.", "prep.", "pron.", "conj.", "interj.",
+            "aux.", "modal.", "det.", "num.", "abbr.", "phr."
+        ]
+    }
+
     private func extractPOS(_ line: String) -> String? {
-        let prefixes = ["n.", "v.", "adj.", "adv.", "prep.", "pron.", "conj.", "interj."]
         let lower = line.lowercased()
-        return prefixes.first { lower.hasPrefix($0) }
+        return partOfSpeechPrefixes.first { lower.hasPrefix($0) }
     }
 
     private func sortByPartOfSpeechPriority(_ lines: [String]) -> [String] {
         let priority: [String: Int] = [
-            "n.": 0, "v.": 1, "adj.": 2, "adv.": 3, "prep.": 4, "pron.": 5, "conj.": 6, "interj.": 7
+            "n.": 0, "v.": 1, "vt.": 1, "vi.": 1, "adj.": 2, "a.": 2, "adv.": 3, "ad.": 3, "prep.": 4,
+            "pron.": 5, "conj.": 6, "interj.": 7, "aux.": 8, "modal.": 9, "det.": 10,
+            "num.": 11, "abbr.": 12, "phr.": 13
         ]
         return lines.sorted { lhs, rhs in
             let lp = extractPOS(lhs).flatMap { priority[$0] } ?? 999
@@ -334,6 +345,36 @@ final class SQLiteDictionaryStore {
             out.append(item)
         }
         return out
+    }
+
+    private func splitMixedPartOfSpeechLine(_ line: String) -> [String] {
+        let markers = partOfSpeechPrefixes
+            .map { NSRegularExpression.escapedPattern(for: $0) }
+            .joined(separator: "|")
+        let markerPattern = "(?:^|[\\s,，;；/|])(\(markers))"
+        guard let regex = try? NSRegularExpression(pattern: markerPattern, options: [.caseInsensitive]) else {
+            return [line]
+        }
+
+        let range = NSRange(line.startIndex..., in: line)
+        let matches = regex.matches(in: line, options: [], range: range)
+        guard matches.count > 1 else { return [line] }
+
+        var ranges: [Range<String.Index>] = []
+        for index in 0..<matches.count {
+            let startLocation = matches[index].range.location
+            let endLocation = index + 1 < matches.count ? matches[index + 1].range.location : line.utf16.count
+            let start = String.Index(utf16Offset: startLocation, in: line)
+            let end = String.Index(utf16Offset: endLocation, in: line)
+            guard start < end else { continue }
+            ranges.append(start..<end)
+        }
+
+        let parts = ranges
+            .map { String(line[$0]).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        return parts.isEmpty ? [line] : parts
     }
 }
 

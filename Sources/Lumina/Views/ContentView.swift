@@ -50,6 +50,10 @@ struct ContentView: View {
     @State private var aiSystemPrompt = ""
     @State private var dailyUsage: [AIUsageBucket] = []
     @State private var monthlyUsage: [AIUsageBucket] = []
+    @State private var isRecordingQuickShortcut = false
+    @State private var quickShortcutRecorderMonitor: Any?
+    @State private var quickShortcutHint = ""
+    @State private var hoveredWindowControl: WindowControlKind?
 
     private let translator = TranslatorService.shared
     private let speech = SpeechService.shared
@@ -79,13 +83,27 @@ struct ContentView: View {
         case longText
     }
 
+    private enum WindowControlKind: Hashable {
+        case close
+        case minimize
+        case zoom
+
+        var hoverSymbolName: String {
+            switch self {
+            case .close: return "xmark"
+            case .minimize: return "minus"
+            case .zoom: return "plus"
+            }
+        }
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color(red: 0.11, green: 0.11, blue: 0.15),
-                    Color(red: 0.08, green: 0.08, blue: 0.11),
-                    Color(red: 0.16, green: 0.13, blue: 0.22)
+                    Color(red: 0.18, green: 0.18, blue: 0.20),
+                    Color(red: 0.13, green: 0.13, blue: 0.15),
+                    Color(red: 0.20, green: 0.19, blue: 0.22)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -100,26 +118,55 @@ struct ContentView: View {
                     .animation(.spring(response: 0.35, dampingFraction: 0.82), value: sidebarCollapsed)
 
                 VStack(spacing: 0) {
-                    header
-
                     Group {
                         switch selectedSidebarPanel {
                         case .translate:
-                            switch selectedSection {
-                            case .dictionary:
-                                dictionaryView
-                            case .textPhrase:
-                                textPhraseView
+                            VStack(spacing: 10) {
+                                modeTabs
+                                    .padding(.top, 4)
+                                switch selectedSection {
+                                case .dictionary:
+                                    dictionaryView
+                                case .textPhrase:
+                                    textPhraseView
+                                }
                             }
                         case .history:
-                            usageHistoryView
+                            VStack(spacing: 10) {
+                                Text("Usage History")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.82))
+                                    .padding(.top, 4)
+                                usageHistoryView
+                            }
                         case .starred:
-                            starredView
+                            VStack(spacing: 10) {
+                                Text("Starred")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.82))
+                                    .padding(.top, 4)
+                                starredView
+                            }
                         }
                     }
                     .padding(24)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(alignment: .topLeading) {
+                    mainWindowControlGroup
+                        .padding(.leading, 14)
+                        .padding(.top, 10)
+                }
+                .contentShape(Rectangle())
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        if !sidebarCollapsed {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                                sidebarCollapsed = true
+                            }
+                        }
+                    }
+                )
             }
             .background(.black.opacity(0.28))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -128,24 +175,26 @@ struct ContentView: View {
                     .stroke(.white.opacity(0.14), lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.5), radius: 26, y: 14)
-            .padding(24)
-            .overlay(alignment: .topLeading) {
-                windowControlDots
-                    .padding(.leading, 40)
-                    .padding(.top, 40)
-            }
-
-            if quickTranslateVisible {
-                quickTranslateOverlay
-                    .transition(.opacity)
-                    .zIndex(10)
+            .padding(.horizontal, 14)
+            .padding(.top, 1)
+            .padding(.bottom, 14)
+            .overlay(alignment: .bottomLeading) {
+                if sidebarCollapsed {
+                    sidebarToggleButton
+                        .padding(.leading, 34)
+                        .padding(.bottom, 32)
+                }
             }
         }
         .preferredColorScheme(.dark)
         .fontDesign(.rounded)
-        .animation(.easeInOut(duration: 0.22), value: quickTranslateVisible)
         .onChange(of: sourceText) { _, newValue in
             sourceCharCount = newValue.count
+        }
+        .onChange(of: showSettingsSheet) { _, opened in
+            if !opened {
+                stopQuickShortcutRecording()
+            }
         }
         .onChange(of: selectedSection) { _, newValue in
             if newValue == .textPhrase {
@@ -163,14 +212,18 @@ struct ContentView: View {
                 longTextSourceFocused = false
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .luminaQuickTranslateRequested)) { _ in
-            logger.info("[LuminaInput] received quick translate notification")
-            toggleQuickTranslate()
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            if !sidebarCollapsed {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                    sidebarCollapsed = true
+                }
+            }
         }
         .onAppear {
             localEntryCount = translator.localEntryCount()
             reloadAISettings()
             reloadUsageMetrics()
+            quickShortcutHint = "可点击“录制快捷键”自定义"
             longTextCardsVisible = selectedSection == .textPhrase
             if selectedSection == .textPhrase {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
@@ -200,6 +253,73 @@ struct ContentView: View {
                 importStatusMessage = "导入失败：\(error.localizedDescription)"
             }
         }
+    }
+
+    private var sidebarToggleButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                sidebarCollapsed.toggle()
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.84))
+                .frame(width: 30, height: 30)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var mainWindowControlGroup: some View {
+        HStack(spacing: 9) {
+            mainWindowControlDot(kind: .close, color: Color(red: 1.0, green: 0.37, blue: 0.34)) {
+                currentMainWindow()?.performClose(nil)
+            }
+            .help("关闭")
+
+            mainWindowControlDot(kind: .minimize, color: Color(red: 1.0, green: 0.74, blue: 0.18)) {
+                currentMainWindow()?.miniaturize(nil)
+            }
+            .help("最小化")
+
+            mainWindowControlDot(kind: .zoom, color: Color(red: 0.15, green: 0.79, blue: 0.25)) {
+                currentMainWindow()?.zoom(nil)
+            }
+            .help("缩放")
+        }
+    }
+
+    private func mainWindowControlDot(kind: WindowControlKind, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Circle()
+                .fill(color)
+                .frame(width: 12, height: 12)
+                .overlay {
+                    Circle()
+                        .stroke(.black.opacity(0.18), lineWidth: 0.5)
+                }
+                .overlay {
+                    if hoveredWindowControl == kind {
+                        Image(systemName: kind.hoverSymbolName)
+                            .font(.system(size: 6.5, weight: .black))
+                            .foregroundStyle(.black.opacity(0.72))
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering in
+            hoveredWindowControl = isHovering ? kind : (hoveredWindowControl == kind ? nil : hoveredWindowControl)
+        }
+    }
+
+    private func currentMainWindow() -> NSWindow? {
+        if let key = NSApp.keyWindow, !(key is NSPanel) {
+            return key
+        }
+        if let main = NSApp.mainWindow, !(main is NSPanel) {
+            return main
+        }
+        return NSApp.windows.first { !($0 is NSPanel) }
     }
 
     private var header: some View {
@@ -303,8 +423,8 @@ struct ContentView: View {
                 .kerning(1.0)
                 .foregroundStyle(.white.opacity(0.56))
                 .padding(.leading, 12)
-                .padding(.top, 60)
-                .padding(.bottom, 14)
+                .padding(.top, 22)
+                .padding(.bottom, 10)
 
             Button {
                 selectedSidebarPanel = .translate
@@ -347,7 +467,7 @@ struct ContentView: View {
         .padding(.horizontal, 12)
         .background(.black.opacity(0.22))
         .overlay(alignment: .trailing) {
-            Rectangle().fill(.white.opacity(0.08)).frame(width: 1)
+            Rectangle().fill(.white.opacity(0.04)).frame(width: 1)
         }
     }
 
@@ -371,7 +491,8 @@ struct ContentView: View {
             dictionarySearchBar
                 .padding(.top, 6)
 
-            if let entry = dictionaryEntry {
+            ScrollView {
+                if let entry = dictionaryEntry {
                     VStack(alignment: .leading, spacing: LayoutToken.sectionGap) {
                         HStack {
                             Text(entry.term)
@@ -542,7 +663,7 @@ struct ContentView: View {
                     .offset(y: dictionaryResultVisible ? 0 : 24)
                     .opacity(dictionaryResultVisible ? 1 : 0.02)
                     .animation(.spring(response: 0.42, dampingFraction: 0.86), value: dictionaryResultVisible)
-            } else if !dictionaryQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                } else if !dictionaryQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("No exact match in local dictionary")
                             .font(.system(size: 20, weight: .semibold))
@@ -594,9 +715,14 @@ struct ContentView: View {
                     .offset(y: dictionaryResultVisible ? 0 : 24)
                     .opacity(dictionaryResultVisible ? 1 : 0.02)
                     .animation(.spring(response: 0.42, dampingFraction: 0.86), value: dictionaryResultVisible)
+                } else {
+                    Color.clear
+                        .frame(height: 1)
+                }
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var dictionarySearchBar: some View {
@@ -696,7 +822,7 @@ struct ContentView: View {
                             .padding(.leading, 6)
                     }
                 }
-                .frame(minHeight: 170)
+                .frame(height: 190)
                 .overlay(alignment: .bottomTrailing) {
                     Button {
                         speech.speak(sourceText, language: "en-US")
@@ -746,7 +872,7 @@ struct ContentView: View {
                     if isAIWorking {
                         translatingInProgressView
                     } else {
-                        Text(resultText.isEmpty ? "结果将在这里显示..." : resultText)
+                        Text(verbatim: resultText.isEmpty ? "结果将在这里显示..." : resultText)
                             .font(.system(size: 18, weight: .medium))
                             .lineSpacing(5)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -754,7 +880,7 @@ struct ContentView: View {
                             .padding(.trailing, 4)
                     }
                 }
-                .frame(minHeight: 170)
+                .frame(height: 190)
             }
             .padding(16)
             .background(resultPanelBackground, in: RoundedRectangle(cornerRadius: 12))
@@ -1084,154 +1210,95 @@ struct ContentView: View {
         }
     }
 
-    private var windowControlDots: some View {
-        HStack(spacing: 8) {
-            Circle().fill(Color(red: 1.0, green: 0.37, blue: 0.34)).frame(width: 12, height: 12)
-            Circle().fill(Color(red: 1.0, green: 0.74, blue: 0.18)).frame(width: 12, height: 12)
-            Circle().fill(Color(red: 0.15, green: 0.79, blue: 0.25)).frame(width: 12, height: 12)
-        }
-    }
-
     private var quickTranslateOverlay: some View {
-        ZStack {
-            Rectangle()
-                .fill(.black.opacity(0.45))
-                .ignoresSafeArea()
-                .onTapGesture {
-                    closeQuickTranslate()
+        Group {
+            if quickTranslateMode == .word {
+                HStack(spacing: 12) {
+                    Picker("Mode", selection: $quickTranslateMode) {
+                        Text("Dictionary").tag(QuickTranslateMode.word)
+                        Text("Long Text").tag(QuickTranslateMode.longText)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 220)
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.58))
+
+                        MacInputField(
+                            text: $quickTranslateText,
+                            placeholder: "Quick translate (Word)...",
+                            fontSize: 40,
+                            autoFocus: quickTranslateVisible,
+                            onSubmit: {
+                                applyQuickResultToDictionary()
+                            },
+                            onUp: {
+                                guard !quickCandidates.isEmpty else { return }
+                                quickSelectedIndex = max(quickSelectedIndex - 1, 0)
+                                quickTranslateEntry = quickCandidates[quickSelectedIndex]
+                            },
+                            onDown: {
+                                guard !quickCandidates.isEmpty else { return }
+                                quickSelectedIndex = min(quickSelectedIndex + 1, quickCandidates.count - 1)
+                                quickTranslateEntry = quickCandidates[quickSelectedIndex]
+                            },
+                            onEscape: {
+                                closeQuickTranslate()
+                            }
+                        )
+                    }
                 }
-
-            VStack(spacing: 0) {
-                Picker("Mode", selection: $quickTranslateMode) {
-                    Text("Dictionary").tag(QuickTranslateMode.word)
-                    Text("Long Text").tag(QuickTranslateMode.longText)
+                .padding(.horizontal, 22)
+                .frame(width: 720, height: 92)
+                .background(.regularMaterial.opacity(0.88), in: RoundedRectangle(cornerRadius: 42, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 42, style: .continuous)
+                        .stroke(.white.opacity(0.3), lineWidth: 0.9)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .padding(.horizontal, 24)
-                .padding(.top, 14)
-                .padding(.bottom, 8)
-
-                if quickTranslateMode == .word {
-                    MacInputField(
-                        text: $quickTranslateText,
-                        placeholder: "Quick translate (Word)...",
-                        fontSize: 24,
-                        autoFocus: quickTranslateVisible,
-                        onSubmit: {
-                            applyQuickResultToDictionary()
-                        },
-                        onUp: {
-                            guard !quickCandidates.isEmpty else { return }
-                            quickSelectedIndex = max(quickSelectedIndex - 1, 0)
-                            quickTranslateEntry = quickCandidates[quickSelectedIndex]
-                        },
-                        onDown: {
-                            guard !quickCandidates.isEmpty else { return }
-                            quickSelectedIndex = min(quickSelectedIndex + 1, quickCandidates.count - 1)
-                            quickTranslateEntry = quickCandidates[quickSelectedIndex]
-                        },
-                        onEscape: {
-                            closeQuickTranslate()
-                        }
-                    )
-                    .frame(height: 64)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 10)
-                    .onChange(of: quickTranslateText) { _, newValue in
-                        refreshQuickCandidates(with: newValue)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 42, style: .continuous)
+                        .stroke(.white.opacity(0.44), lineWidth: 0.42)
+                        .padding(0.5)
+                        .blendMode(.screen)
+                }
+                .shadow(color: .black.opacity(0.14), radius: 12, y: 7)
+                .onChange(of: quickTranslateText) { _, newValue in
+                    refreshQuickCandidates(with: newValue)
+                }
+            } else {
+                VStack(spacing: 0) {
+                    Picker("Mode", selection: $quickTranslateMode) {
+                        Text("Dictionary").tag(QuickTranslateMode.word)
+                        Text("Long Text").tag(QuickTranslateMode.longText)
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .padding(.horizontal, 18)
+                    .padding(.top, 10)
+                    .padding(.bottom, 6)
 
-                    if !quickCandidates.isEmpty {
-                        Divider().overlay(.white.opacity(0.1))
-                        VStack(spacing: 0) {
-                            ForEach(Array(quickCandidates.enumerated()), id: \.element.term) { index, item in
-                                Button {
-                                    quickSelectedIndex = index
-                                    quickTranslateEntry = item
-                                } label: {
-                                    HStack {
-                                        Text(item.term)
-                                            .font(.system(size: 15, weight: .medium))
-                                            .foregroundStyle(.white)
-                                        Spacer()
-                                        Text(item.definitions.first ?? "")
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(.white.opacity(0.58))
-                                            .lineLimit(1)
-                                            .truncationMode(.tail)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 9)
-                                    .background(index == quickSelectedIndex ? .white.opacity(0.12) : .clear)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.top, 8)
-                    }
-
-                    if let entry = quickTranslateEntry {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if quickCandidates.isEmpty {
-                                Divider().overlay(.white.opacity(0.1))
-                            }
-                            HStack {
-                                Text(entry.term)
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                Spacer()
-                                Button {
-                                    speech.speak(entry.term, language: "en-US")
-                                } label: {
-                                    Image(systemName: "speaker.wave.2.fill")
-                                        .foregroundStyle(.white.opacity(0.8))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(.top, 12)
-
-                            HStack(spacing: 10) {
-                                Text("US \(entry.phoneticUS)")
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(.white.opacity(0.08), in: Capsule())
-                                Text("UK \(entry.phoneticUK)")
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(.white.opacity(0.08), in: Capsule())
-                            }
-                            Text(entry.definitions.first ?? "")
-                                .font(.system(size: 14))
-                                .foregroundStyle(.white.opacity(0.82))
-                                .lineLimit(2)
-                                .truncationMode(.tail)
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 20)
-                    }
-                } else {
                     quickTranslateLongTextPanel
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 16)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 12)
                 }
+                .frame(width: 680)
+                .background(.regularMaterial.opacity(0.88), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(.white.opacity(0.26), lineWidth: 0.9)
+                }
+                .shadow(color: .black.opacity(0.14), radius: 12, y: 7)
             }
-            .frame(width: 600)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(.white.opacity(0.16), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.42), radius: 28, y: 18)
-            .transition(
-                .asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 0.95)).combined(with: .offset(y: 20)),
-                    removal: .opacity.combined(with: .scale(scale: 0.97)).combined(with: .offset(y: 10))
-                )
-            )
         }
+        .transition(
+            .asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: 0.95)).combined(with: .offset(y: 20)),
+                removal: .opacity.combined(with: .scale(scale: 0.97)).combined(with: .offset(y: 10))
+            )
+        )
     }
 
     private func applyQuickResultToDictionary() {
@@ -1254,6 +1321,7 @@ struct ContentView: View {
             quickLongResult = ""
             quickLongIsAIWorking = false
         }
+        NotificationCenter.default.post(name: .luminaQuickTranslateClosed, object: nil)
     }
 
     private func openQuickTranslate() {
@@ -1274,6 +1342,40 @@ struct ContentView: View {
             closeQuickTranslate()
         } else {
             openQuickTranslate()
+        }
+    }
+
+    private func startQuickShortcutRecording() {
+        stopQuickShortcutRecording()
+        isRecordingQuickShortcut = true
+        quickShortcutHint = "等待按键..."
+
+        quickShortcutRecorderMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            guard isRecordingQuickShortcut else { return event }
+
+            let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            guard !modifiers.isEmpty else {
+                NSSound.beep()
+                quickShortcutHint = "快捷键需包含至少一个修饰键"
+                return nil
+            }
+
+            if appPreferences.updateQuickShortcut(keyCode: event.keyCode, modifiers: modifiers) {
+                quickShortcutHint = "已设置为 \(appPreferences.quickShortcut.displayTitle)"
+            } else {
+                NSSound.beep()
+                quickShortcutHint = "设置失败，请重试"
+            }
+            stopQuickShortcutRecording()
+            return nil
+        }
+    }
+
+    private func stopQuickShortcutRecording() {
+        isRecordingQuickShortcut = false
+        if let monitor = quickShortcutRecorderMonitor {
+            NSEvent.removeMonitor(monitor)
+            quickShortcutRecorderMonitor = nil
         }
     }
 
@@ -1516,14 +1618,28 @@ struct ContentView: View {
 
                         Text("Quick Translate 快捷键")
                             .font(.system(size: 14, weight: .semibold))
-                        Picker("快捷键", selection: $appPreferences.quickShortcutPreset) {
-                            ForEach(QuickShortcutPreset.allCases, id: \.self) { preset in
-                                Text(preset.title).tag(preset)
+                        HStack(spacing: 10) {
+                            Button(isRecordingQuickShortcut ? "按下新快捷键..." : "录制快捷键") {
+                                if isRecordingQuickShortcut {
+                                    stopQuickShortcutRecording()
+                                } else {
+                                    startQuickShortcutRecording()
+                                }
                             }
+                            .buttonStyle(.borderedProminent)
+
+                            Button("默认 (Command + K)") {
+                                _ = appPreferences.updateQuickShortcut(keyCode: 40, modifiers: [.command])
+                                quickShortcutHint = "已恢复默认快捷键"
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        Text("当前快捷键：\(appPreferences.quickShortcutPreset.title)")
+                        Text("当前快捷键：\(appPreferences.quickShortcut.displayTitle)")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
+                        Text(isRecordingQuickShortcut ? "正在录制：请按下组合键（需包含 Command/Option/Control/Shift）" : quickShortcutHint)
+                            .font(.system(size: 12))
+                            .foregroundStyle(isRecordingQuickShortcut ? .orange : .secondary)
 
                         Divider()
 
