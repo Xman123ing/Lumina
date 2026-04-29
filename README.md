@@ -1,38 +1,61 @@
-# Lumina Dictionary Data
+# Lumina
 
-Lumina now uses SQLite as the local dictionary backend.
+Lumina 是一个面向 macOS 的原生翻译应用，支持：
 
-## Built-in Dictionary (Default)
+- 本地离线词典（SQLite / ECDICT）
+- Quick Translate 迷你浮窗（Spotlight 风格）
+- 长文本 AI 翻译（OpenAI 兼容接口）
+- 原生 TTS 朗读（含朗读角色配置）
+- 菜单栏驻留与全局快捷键唤起
 
-- The app ships with a bundled large SQLite dictionary:
-  `Sources/Lumina/Resources/builtin_dictionary.sqlite3`
-- It is generated from **ECDICT** and contains hundreds of thousands of entries.
-- On launch, if local DB is missing or too small, the app auto-installs/replaces it.
-- Users can query common words immediately without manual import.
+## 环境要求
 
-## Chosen Large Dictionary
+- macOS 14+
+- Xcode 16+
+- Swift 6.2（见 `Package.swift`）
 
-- **ECDICT** (English-Chinese Dictionary Database)
-- Reason: widely used, open-source, large vocabulary, suitable for offline lookup and candidate search.
-
-## Import ECDICT CSV
-
-1. Download `ecdict.csv` from an ECDICT source.
-2. Run:
+## 本地运行（Debug）
 
 ```bash
 cd /Users/pinli/Workshop/Lumina
-python Scripts/import_ecdict_csv.py /path/to/ecdict.csv
+xcodebuild -scheme Lumina -configuration Debug -destination "platform=macOS" -derivedDataPath build build
 ```
 
-3. The data will be imported to:
+可执行文件输出在：
 
-`~/Library/Application Support/Lumina/dictionaries/ecdict.sqlite3`
+- `build/Build/Products/Debug/Lumina`
 
-After import, restart the app to use the new data.
+## 生成 DMG（Release）
 
-## In-app Custom Dictionary Import
+项目已提供一键脚本：`Scripts/package_dmg.sh`。
 
-- Open `Settings` in the sidebar.
-- Click `导入自定义 TSV/CSV 词典`.
-- The app imports your file into the same SQLite database.
+```bash
+cd /Users/pinli/Workshop/Lumina
+chmod +x Scripts/package_dmg.sh
+./Scripts/package_dmg.sh
+```
+
+脚本会自动完成：
+
+- Release 构建
+- 组装 `.app` 包
+- 生成应用图标（`AppIcon.icns`）
+- `codesign`（ad-hoc）
+- 生成标准拖拽安装 DMG（左侧 App、右侧 `Applications`）
+
+生成产物：
+
+- `release/Lumina.dmg`
+
+## 内置词库与导入
+
+- 内置词库文件：`Sources/Lumina/Resources/builtin_dictionary.sqlite3`
+- 首次启动会自动安装到用户目录：
+  - `~/Library/Application Support/Lumina/dictionaries/ecdict.sqlite3`
+- 支持两种导入方式：
+  - Settings 页面导入 TSV/CSV
+  - 命令行导入 ECDICT CSV：
+
+```bash
+python Scripts/import_ecdict_csv.py /path/to/ecdict.csv
+```

@@ -181,8 +181,8 @@ struct ContentView: View {
             .overlay(alignment: .bottomLeading) {
                 if sidebarCollapsed {
                     sidebarToggleButton
-                        .padding(.leading, 34)
-                        .padding(.bottom, 32)
+                        .padding(.leading, 20)
+                        .padding(.bottom, 14)
                 }
             }
         }
@@ -855,17 +855,15 @@ struct ContentView: View {
                         .foregroundStyle(.purple.opacity(0.95))
                     Spacer()
                     Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(resultText, forType: .string)
+                        copyLongTextResult()
                     } label: {
-                        Image(systemName: "square.on.square.circle.fill")
-                            .font(.system(size: 22))
+                        Image(systemName: "doc.on.doc.fill")
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
                     }
                     .buttonStyle(.plain)
-                    .disabled(resultText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAIWorking)
-                    .opacity((resultText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAIWorking) ? 0.45 : 1.0)
+                    .opacity(0.95)
                     .help("复制翻译结果")
                 }
                 ScrollView {
@@ -878,6 +876,7 @@ struct ContentView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .foregroundStyle(resultText.isEmpty ? .white.opacity(0.45) : .white.opacity(0.96))
                             .padding(.trailing, 4)
+                            .textSelection(.enabled)
                     }
                 }
                 .frame(height: 190)
@@ -1114,6 +1113,13 @@ struct ContentView: View {
             isAIWorking = false
             reloadUsageMetrics()
         }
+    }
+
+    private func copyLongTextResult() {
+        let trimmed = resultText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(trimmed, forType: .string)
     }
 
     private func isLikelySuccessfulAIResponse(_ text: String) -> Bool {

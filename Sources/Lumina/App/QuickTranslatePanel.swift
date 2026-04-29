@@ -10,6 +10,9 @@ private final class SpotlightPanel: NSPanel {
 final class QuickTranslatePanelController: NSObject, NSWindowDelegate {
     private var panel: SpotlightPanel?
     private var hostingView: NSHostingView<QuickTranslatePanelView>?
+    private let collapsedWidth: CGFloat = 380
+    private let collapsedHeight: CGFloat = 60
+    private let expandedHeight: CGFloat = 180
 
     func toggle() {
         if panel?.isVisible == true {
@@ -27,6 +30,7 @@ final class QuickTranslatePanelController: NSObject, NSWindowDelegate {
         if let hostingView {
             hostingView.rootView = makeRootView()
         }
+        updatePanelSize(height: collapsedHeight, width: collapsedWidth, animated: false)
         position(panel: panel)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
@@ -45,7 +49,7 @@ final class QuickTranslatePanelController: NSObject, NSWindowDelegate {
     }
 
     private func buildPanel() {
-        let contentRect = NSRect(x: 0, y: 0, width: 380, height: 60)
+        let contentRect = NSRect(x: 0, y: 0, width: collapsedWidth, height: collapsedHeight)
         let panel = SpotlightPanel(
             contentRect: contentRect,
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
@@ -95,16 +99,20 @@ final class QuickTranslatePanelController: NSObject, NSWindowDelegate {
         panel.setFrameOrigin(origin)
     }
 
-    private func updatePanelHeight(_ height: CGFloat) {
+    private func updatePanelSize(height: CGFloat, width: CGFloat, animated: Bool = true) {
         guard let panel else { return }
-        let target = max(60, height)
-        guard abs(panel.frame.height - target) > 0.5 else { return }
+        let target = max(collapsedHeight, height)
+        let targetWidth = max(collapsedWidth, width)
+        guard abs(panel.frame.height - target) > 0.5 || abs(panel.frame.width - targetWidth) > 0.5 else { return }
 
         var frame = panel.frame
         let maxY = frame.maxY
+        let midX = frame.midX
+        frame.size.width = targetWidth
         frame.size.height = target
         frame.origin.y = maxY - target
-        panel.setFrame(frame, display: true, animate: true)
+        frame.origin.x = midX - targetWidth / 2
+        panel.setFrame(frame, display: true, animate: animated)
     }
 
     private func makeRootView() -> QuickTranslatePanelView {
@@ -112,8 +120,10 @@ final class QuickTranslatePanelController: NSObject, NSWindowDelegate {
             onClose: { [weak self] in
                 self?.hide()
             },
-            onPreferredHeightChange: { [weak self] height in
-                self?.updatePanelHeight(height)
+            onPreferredFrameChange: { [weak self] _, hasVisibleResult in
+                let width = self?.collapsedWidth ?? 380
+                let height = hasVisibleResult ? self?.expandedHeight ?? 180 : self?.collapsedHeight ?? 60
+                self?.updatePanelSize(height: height, width: width)
             }
         )
     }
@@ -135,7 +145,8 @@ private struct QuickTranslatePanelView: View {
 
     private let translator = TranslatorService.shared
     private let onClose: () -> Void
-    private let onPreferredHeightChange: (CGFloat) -> Void
+    private let onPreferredFrameChange: (CGFloat, Bool) -> Void
+    private let inputAreaHeight: CGFloat = 60
 
     private var hasVisibleResult: Bool {
         if mode == .dictionary {
@@ -145,35 +156,26 @@ private struct QuickTranslatePanelView: View {
     }
 
     private var preferredHeight: CGFloat {
-        if mode == .dictionary, let entry = dictionaryEntry {
-            let definitionsHeight = min(110, CGFloat(max(1, entry.definitions.count)) * 12)
-            return 65 + definitionsHeight
-        }
-        if mode == .dictionary, !dictionaryFeedback.isEmpty {
-            return 82
-        }
-        if mode == .longText, !longTextResult.isEmpty {
-            return 110
-        }
-        return 60
+        hasVisibleResult ? 180 : 60
     }
 
-    init(onClose: @escaping () -> Void, onPreferredHeightChange: @escaping (CGFloat) -> Void) {
+    init(onClose: @escaping () -> Void, onPreferredFrameChange: @escaping (CGFloat, Bool) -> Void) {
         self.onClose = onClose
-        self.onPreferredHeightChange = onPreferredHeightChange
+        self.onPreferredFrameChange = onPreferredFrameChange
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if hasVisibleResult {
-                inputRow
-                    .padding(.top, 4)
+            inputRow
+                .padding(.top, 4)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .frame(height: inputAreaHeight)
 
+            if hasVisibleResult {
                 resultSection
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.top, 12)
                     .padding(.bottom, 5)
-            } else {
-                inputRow
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
         }
         .padding(.horizontal, 8)
@@ -192,16 +194,16 @@ private struct QuickTranslatePanelView: View {
         .shadow(color: .black.opacity(0.18), radius: 6, y: 4)
         .onAppear {
             resetToDefaultMode()
-            onPreferredHeightChange(preferredHeight)
+            onPreferredFrameChange(preferredHeight, hasVisibleResult)
         }
         .onChange(of: dictionaryEntry?.term) { _, _ in
-            onPreferredHeightChange(preferredHeight)
+            onPreferredFrameChange(preferredHeight, hasVisibleResult)
         }
         .onChange(of: longTextResult) { _, _ in
-            onPreferredHeightChange(preferredHeight)
+            onPreferredFrameChange(preferredHeight, hasVisibleResult)
         }
         .onChange(of: dictionaryFeedback) { _, _ in
-            onPreferredHeightChange(preferredHeight)
+            onPreferredFrameChange(preferredHeight, hasVisibleResult)
         }
     }
 
@@ -313,7 +315,7 @@ private struct QuickTranslatePanelView: View {
             dictionaryEntry = nil
             longTextResult = ""
             dictionaryFeedback = ""
-            onPreferredHeightChange(preferredHeight)
+            onPreferredFrameChange(preferredHeight, hasVisibleResult)
         }
     }
 
@@ -321,11 +323,21 @@ private struct QuickTranslatePanelView: View {
     private var resultSection: some View {
         if mode == .dictionary {
             if let entry = dictionaryEntry {
-                ScrollView(.vertical, showsIndicators: true) {
+                let shouldShowIndicator = entry.definitions.count >= 4
+                ScrollView(.vertical, showsIndicators: shouldShowIndicator) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("常用释义")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.black.opacity(0.72))
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [
+                                        .purple.opacity(0.95),
+                                        .blue.opacity(0.9)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                         ForEach(entry.definitions, id: \.self) { definition in
                             Text(verbatim: definition)
                                 .font(.system(size: 16, weight: .medium))
@@ -333,29 +345,36 @@ private struct QuickTranslatePanelView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxHeight: 56)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.leading, 30)
-                .padding(.trailing, 12)
+                .padding(.trailing, 2)
                 .padding(.top, 2)
             } else if !dictionaryFeedback.isEmpty {
-                Text(dictionaryFeedback)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.black.opacity(0.64))
-                    .padding(.leading, 30)
-                    .padding(.top, 2)
+                ScrollView(.vertical, showsIndicators: dictionaryFeedback.count > 100) {
+                    Text(dictionaryFeedback)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.black.opacity(0.64))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.leading, 30)
+                .padding(.trailing, 2)
+                .padding(.top, 2)
             }
         } else if !longTextResult.isEmpty {
-            ScrollView(.vertical, showsIndicators: true) {
+            let shouldShowIndicator = longTextResult.count > 120
+            ScrollView(.vertical, showsIndicators: shouldShowIndicator) {
                 Text(verbatim: longTextResult)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.black.opacity(0.78))
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxHeight: 56)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.leading, 30)
-            .padding(.trailing, 12)
+            .padding(.trailing, 2)
             .padding(.top, 2)
         }
     }
