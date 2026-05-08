@@ -786,128 +786,143 @@ struct ContentView: View {
     }
 
     private var textPhraseView: some View {
-        VStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Label("Source Text", systemImage: "text.alignleft")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
-                    Spacer()
-                    Button {
-                        sourceText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
+        GeometryReader { proxy in
+            let sectionSpacing: CGFloat = 12
+            let toolbarHeight: CGFloat = 44
+            let verticalInset: CGFloat = 4
+            let availableForCards = max(80, proxy.size.height - toolbarHeight - sectionSpacing * 2 - verticalInset * 2)
+            let cardHeight = availableForCards / 2
+
+            VStack(spacing: sectionSpacing) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Label("Source Text", systemImage: "text.alignleft")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                        Spacer()
+                        Button {
+                            sourceText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.white.opacity(0.78))
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.35 : 1.0)
+                        .disabled(sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .help("清空源内容")
+                        Text("\(sourceCharCount) / 5000")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $sourceText)
+                            .focused($longTextSourceFocused)
                             .font(.system(size: 16))
-                            .foregroundStyle(.white.opacity(0.78))
+                            .scrollContentBackground(.hidden)
+                            .scrollIndicators(.hidden)
+                            .foregroundStyle(.white.opacity(0.9))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        if sourceText.isEmpty {
+                            Text("Enter phrase or long text to translate...")
+                                .foregroundStyle(.white.opacity(0.32))
+                                .padding(.top, 2)
+                                .padding(.leading, 6)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .opacity(sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.35 : 1.0)
-                    .disabled(sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .help("清空源内容")
-                    Text("\(sourceCharCount) / 5000")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-                ZStack(alignment: .topLeading) {
-                    TextEditor(text: $sourceText)
-                        .focused($longTextSourceFocused)
-                        .font(.system(size: 16))
-                        .scrollContentBackground(.hidden)
-                        .scrollIndicators(.hidden)
-                        .foregroundStyle(.white.opacity(0.9))
-                    if sourceText.isEmpty {
-                        Text("Enter phrase or long text to translate...")
-                            .foregroundStyle(.white.opacity(0.32))
-                            .padding(.top, 2)
-                            .padding(.leading, 6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .overlay(alignment: .bottomTrailing) {
+                        Button {
+                            speech.speak(sourceText, language: "en-US")
+                        } label: {
+                            Image(systemName: "speaker.wave.2.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.white.opacity(0.9))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 8)
+                        .padding(.bottom, 8)
+                        .disabled(sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .opacity(sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1.0)
+                        .help("朗读源文本")
                     }
                 }
-                .frame(height: 190)
+                .padding(16)
+                .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12).stroke(.white.opacity(0.1), lineWidth: 1)
+                }
+                .frame(height: cardHeight)
+                .offset(y: longTextCardsVisible ? 0 : 26)
+                .opacity(longTextCardsVisible ? 1 : 0.02)
+                .animation(.spring(response: 0.42, dampingFraction: 0.86), value: longTextCardsVisible)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Label("AI Translation Result", systemImage: "sparkles")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.purple.opacity(0.95))
+                        Spacer()
+                        Button {
+                            copyLongTextResult()
+                        } label: {
+                            Image(systemName: "doc.on.doc.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(0.95)
+                        .help("复制翻译结果")
+                    }
+                    ScrollView {
+                        if isAIWorking {
+                            translatingInProgressView
+                        } else {
+                            Text(verbatim: resultText.isEmpty ? "结果将在这里显示..." : resultText)
+                                .font(.system(size: 18, weight: .medium))
+                                .lineSpacing(5)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .foregroundStyle(resultText.isEmpty ? .white.opacity(0.45) : .white.opacity(0.96))
+                                .padding(.trailing, 4)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+                .padding(16)
+                .background(resultPanelBackground, in: RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12).stroke(resultPanelBorder, lineWidth: 1)
+                }
+                .frame(height: cardHeight)
                 .overlay(alignment: .bottomTrailing) {
                     Button {
-                        speech.speak(sourceText, language: "en-US")
+                        speech.speak(resultText, language: "zh-CN")
                     } label: {
                         Image(systemName: "speaker.wave.2.circle.fill")
                             .font(.system(size: 20))
                             .foregroundStyle(.white.opacity(0.9))
                     }
                     .buttonStyle(.plain)
-                    .padding(.trailing, 8)
-                    .padding(.bottom, 8)
-                    .disabled(sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .opacity(sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1.0)
-                    .help("朗读源文本")
+                    .padding(.trailing, 10)
+                    .padding(.bottom, 10)
+                    .disabled(resultText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAIWorking)
+                    .opacity((resultText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAIWorking) ? 0.45 : 1.0)
+                    .help("朗读翻译结果")
                 }
-            }
-            .padding(16)
-            .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12).stroke(.white.opacity(0.1), lineWidth: 1)
-            }
-            .offset(y: longTextCardsVisible ? 0 : 26)
-            .opacity(longTextCardsVisible ? 1 : 0.02)
-            .animation(.spring(response: 0.42, dampingFraction: 0.86), value: longTextCardsVisible)
+                .shadow(color: lastTranslationSucceeded ? .purple.opacity(0.16) : .clear, radius: 14, y: 4)
+                .offset(y: longTextCardsVisible ? 0 : 36)
+                .opacity(longTextCardsVisible ? 1 : 0.02)
+                .animation(.spring(response: 0.5, dampingFraction: 0.84).delay(0.06), value: longTextCardsVisible)
 
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Label("AI Translation Result", systemImage: "sparkles")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.purple.opacity(0.95))
-                    Spacer()
-                    Button {
-                        copyLongTextResult()
-                    } label: {
-                        Image(systemName: "doc.on.doc.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(0.95)
-                    .help("复制翻译结果")
-                }
-                ScrollView {
-                    if isAIWorking {
-                        translatingInProgressView
-                    } else {
-                        Text(verbatim: resultText.isEmpty ? "结果将在这里显示..." : resultText)
-                            .font(.system(size: 18, weight: .medium))
-                            .lineSpacing(5)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(resultText.isEmpty ? .white.opacity(0.45) : .white.opacity(0.96))
-                            .padding(.trailing, 4)
-                            .textSelection(.enabled)
-                    }
-                }
-                .frame(height: 190)
+                aiTranslateToolbar(action: runTextTranslation)
+                    .frame(height: toolbarHeight)
             }
-            .padding(16)
-            .background(resultPanelBackground, in: RoundedRectangle(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12).stroke(resultPanelBorder, lineWidth: 1)
-            }
-            .overlay(alignment: .bottomTrailing) {
-                Button {
-                    speech.speak(resultText, language: "zh-CN")
-                } label: {
-                    Image(systemName: "speaker.wave.2.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 10)
-                .padding(.bottom, 10)
-                .disabled(resultText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAIWorking)
-                .opacity((resultText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAIWorking) ? 0.45 : 1.0)
-                .help("朗读翻译结果")
-            }
-            .shadow(color: lastTranslationSucceeded ? .purple.opacity(0.16) : .clear, radius: 14, y: 4)
-            .offset(y: longTextCardsVisible ? 0 : 36)
-            .opacity(longTextCardsVisible ? 1 : 0.02)
-            .animation(.spring(response: 0.5, dampingFraction: 0.84).delay(0.06), value: longTextCardsVisible)
-
-            aiTranslateToolbar(action: runTextTranslation)
+            .padding(.vertical, verticalInset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var usageHistoryView: some View {

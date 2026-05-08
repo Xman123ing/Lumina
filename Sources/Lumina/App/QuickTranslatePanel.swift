@@ -142,6 +142,8 @@ private struct QuickTranslatePanelView: View {
     @State private var dictionaryFeedback = ""
     @State private var isAIWorking = false
     @State private var modePickerPresented = false
+    @State private var isModeButtonHovered = false
+    @State private var isOpenButtonHovered = false
 
     private let translator = TranslatorService.shared
     private let onClose: () -> Void
@@ -214,14 +216,19 @@ private struct QuickTranslatePanelView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(.white.opacity(0.22))
+                        .fill(.black.opacity(isModeButtonHovered ? 0.36 : 0.24))
                     Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.86))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.94))
                 }
                 .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
+            .onHover { isHovering in
+                withAnimation(.easeOut(duration: 0.12)) {
+                    isModeButtonHovered = isHovering
+                }
+            }
             .popover(isPresented: $modePickerPresented, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     Button {
@@ -301,13 +308,18 @@ private struct QuickTranslatePanelView: View {
                 Button {
                     openMainApp()
                 } label: {
-                    Image(systemName: "macwindow.on.rectangle")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .frame(width: 20, height: 20)
-                        .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.94))
+                        .frame(width: 22, height: 22)
+                        .background(.black.opacity(isOpenButtonHovered ? 0.36 : 0.24), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                .onHover { isHovering in
+                    withAnimation(.easeOut(duration: 0.12)) {
+                        isOpenButtonHovered = isHovering
+                    }
+                }
                 .help("Open Lumina")
             }
         }

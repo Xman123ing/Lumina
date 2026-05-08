@@ -21,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         setupStatusBarItem()
         setupGlobalQuickShortcut()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.main.async {
             self.bindMainWindowIfNeeded()
         }
         NotificationCenter.default.addObserver(
@@ -66,9 +66,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func bindMainWindowIfNeeded() {
-        guard let window = NSApp.windows.first else { return }
+        guard let window = NSApp.windows.first(where: { !($0 is NSPanel) }) else { return }
         mainWindow = window
         window.delegate = self
+        // Disable window restoration to avoid launch-time frame jump.
+        window.isRestorable = false
         window.styleMask.insert(.resizable)
         window.styleMask.insert(.miniaturizable)
         window.titleVisibility = .hidden
@@ -231,6 +233,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         window.contentMinSize = NSSize(width: 960, height: 640)
         window.contentMaxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        window.setFrame(NSRect(origin: origin, size: defaultSize), display: true)
+        window.setFrame(NSRect(origin: origin, size: defaultSize), display: true, animate: false)
     }
 }
