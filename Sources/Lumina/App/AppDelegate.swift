@@ -42,6 +42,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             name: .luminaQuickTranslateRequested,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeModeChanged),
+            name: .luminaThemeModeChanged,
+            object: nil
+        )
+        applyThemeAppearance(mode: AppPreferences.shared.themeMode)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -63,6 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func handleQuickTranslateRequested(_ notification: Notification) {
         quickPanelController.toggle()
+    }
+
+    @objc private func handleThemeModeChanged(_ notification: Notification) {
+        guard let mode = notification.object as? AppThemeMode else { return }
+        applyThemeAppearance(mode: mode)
     }
 
     private func bindMainWindowIfNeeded() {
@@ -234,5 +246,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.contentMinSize = NSSize(width: 960, height: 640)
         window.contentMaxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         window.setFrame(NSRect(origin: origin, size: defaultSize), display: true, animate: false)
+    }
+
+    private func applyThemeAppearance(mode: AppThemeMode) {
+        let appearance: NSAppearance?
+        switch mode {
+        case .auto:
+            appearance = nil
+        case .light:
+            appearance = NSAppearance(named: .aqua)
+        case .dark:
+            appearance = NSAppearance(named: .darkAqua)
+        }
+        NSApp.appearance = appearance
+        NSApp.windows.forEach { $0.appearance = appearance }
     }
 }

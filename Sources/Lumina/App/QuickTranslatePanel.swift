@@ -144,11 +144,21 @@ private struct QuickTranslatePanelView: View {
     @State private var modePickerPresented = false
     @State private var isModeButtonHovered = false
     @State private var isOpenButtonHovered = false
+    @ObservedObject private var appPreferences = AppPreferences.shared
+    @Environment(\.colorScheme) private var systemColorScheme
 
     private let translator = TranslatorService.shared
     private let onClose: () -> Void
     private let onPreferredFrameChange: (CGFloat, Bool) -> Void
     private let inputAreaHeight: CGFloat = 60
+
+    private var resolvedColorScheme: ColorScheme {
+        appPreferences.themeMode.preferredColorScheme ?? systemColorScheme
+    }
+
+    private var isLightAppearance: Bool {
+        resolvedColorScheme == .light
+    }
 
     private var hasVisibleResult: Bool {
         if mode == .dictionary {
@@ -194,6 +204,7 @@ private struct QuickTranslatePanelView: View {
                 .blendMode(.screen)
         }
         .shadow(color: .black.opacity(0.18), radius: 6, y: 4)
+        .preferredColorScheme(appPreferences.themeMode.preferredColorScheme)
         .onAppear {
             resetToDefaultMode()
             onPreferredFrameChange(preferredHeight, hasVisibleResult)
@@ -216,10 +227,14 @@ private struct QuickTranslatePanelView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(.black.opacity(isModeButtonHovered ? 0.36 : 0.24))
+                        .fill(
+                            isLightAppearance
+                            ? .black.opacity(isModeButtonHovered ? 0.28 : 0.2)
+                            : .black.opacity(isModeButtonHovered ? 0.36 : 0.24)
+                        )
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.94))
+                        .foregroundStyle(isLightAppearance ? .black.opacity(0.85) : .white.opacity(0.94))
                 }
                 .frame(width: 22, height: 22)
             }
@@ -291,7 +306,7 @@ private struct QuickTranslatePanelView: View {
                                 .fill(.black.opacity(0.45))
                             Image(systemName: "xmark")
                                 .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.95))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.88) : .white.opacity(0.95))
                         }
                         .frame(width: 18, height: 18)
                     }
@@ -310,9 +325,14 @@ private struct QuickTranslatePanelView: View {
                 } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.94))
+                        .foregroundStyle(isLightAppearance ? .black.opacity(0.85) : .white.opacity(0.94))
                         .frame(width: 22, height: 22)
-                        .background(.black.opacity(isOpenButtonHovered ? 0.36 : 0.24), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .background(
+                            isLightAppearance
+                            ? .black.opacity(isOpenButtonHovered ? 0.28 : 0.2)
+                            : .black.opacity(isOpenButtonHovered ? 0.36 : 0.24),
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        )
                 }
                 .buttonStyle(.plain)
                 .onHover { isHovering in

@@ -1,5 +1,33 @@
 import SwiftUI
 
+enum AppThemeMode: String, CaseIterable, Codable {
+    case auto
+    case light
+    case dark
+
+    var title: String {
+        switch self {
+        case .auto:
+            return "跟随系统"
+        case .light:
+            return "浅色"
+        case .dark:
+            return "深色"
+        }
+    }
+
+    var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .auto:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+}
+
 struct QuickShortcut: Codable, Equatable {
     var keyCode: UInt16
     var modifiersRawValue: UInt
@@ -84,6 +112,7 @@ final class AppPreferences: ObservableObject {
     private struct StoredPreferences: Codable {
         let quickShortcut: QuickShortcut
         let speechRolePreset: SpeechRolePreset
+        let themeMode: AppThemeMode
     }
 
     static let shared = AppPreferences()
@@ -97,9 +126,16 @@ final class AppPreferences: ObservableObject {
     @Published var speechRolePreset: SpeechRolePreset {
         didSet { save() }
     }
+    @Published var themeMode: AppThemeMode {
+        didSet {
+            save()
+            NotificationCenter.default.post(name: .luminaThemeModeChanged, object: themeMode)
+        }
+    }
 
     private let storageKey = "lumina.quickShortcut.v2"
     private let speechRoleKey = "lumina.speechRolePreset"
+    private let themeModeKey = "lumina.themeMode"
     private let fileURL: URL
 
     private init() {
@@ -111,6 +147,7 @@ final class AppPreferences: ObservableObject {
         {
             quickShortcut = stored.quickShortcut
             speechRolePreset = stored.speechRolePreset
+            themeMode = stored.themeMode
         } else {
             quickShortcut = Self.loadShortcut()
             if
@@ -121,6 +158,14 @@ final class AppPreferences: ObservableObject {
             } else {
                 speechRolePreset = .balanced
             }
+            if
+                let raw = UserDefaults.standard.string(forKey: themeModeKey),
+                let mode = AppThemeMode(rawValue: raw)
+            {
+                themeMode = mode
+            } else {
+                themeMode = .auto
+            }
         }
         save()
     }
@@ -130,8 +175,13 @@ final class AppPreferences: ObservableObject {
             UserDefaults.standard.set(data, forKey: storageKey)
         }
         UserDefaults.standard.set(speechRolePreset.rawValue, forKey: speechRoleKey)
+        UserDefaults.standard.set(themeMode.rawValue, forKey: themeModeKey)
 
-        let stored = StoredPreferences(quickShortcut: quickShortcut, speechRolePreset: speechRolePreset)
+        let stored = StoredPreferences(
+            quickShortcut: quickShortcut,
+            speechRolePreset: speechRolePreset,
+            themeMode: themeMode
+        )
         if let data = try? JSONEncoder().encode(stored) {
             try? data.write(to: fileURL, options: .atomic)
         }

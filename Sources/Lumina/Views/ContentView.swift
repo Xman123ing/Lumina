@@ -8,6 +8,7 @@ struct ContentView: View {
     private let logger = Logger(subsystem: "Lumina", category: "UI")
     @Namespace private var tabSliderNamespace
     @StateObject private var appPreferences = AppPreferences.shared
+    @Environment(\.colorScheme) private var systemColorScheme
 
     @State private var selectedSection: AppSection = .dictionary
     @State private var selectedSidebarPanel: SidebarPanel = .translate
@@ -58,6 +59,57 @@ struct ContentView: View {
     private let translator = TranslatorService.shared
     private let speech = SpeechService.shared
 
+    private var resolvedColorScheme: ColorScheme {
+        appPreferences.themeMode.preferredColorScheme ?? systemColorScheme
+    }
+
+    private var isLightAppearance: Bool {
+        resolvedColorScheme == .light
+    }
+
+    private var appBackgroundGradient: LinearGradient {
+        if isLightAppearance {
+            return LinearGradient(
+                colors: [
+                    Color(red: 0.95, green: 0.96, blue: 0.98),
+                    Color(red: 0.93, green: 0.94, blue: 0.97),
+                    Color(red: 0.91, green: 0.93, blue: 0.96)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        return LinearGradient(
+            colors: [
+                Color(red: 0.18, green: 0.18, blue: 0.20),
+                Color(red: 0.13, green: 0.13, blue: 0.15),
+                Color(red: 0.20, green: 0.19, blue: 0.22)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var panelFillColor: Color {
+        isLightAppearance ? Color(red: 0.86, green: 0.88, blue: 0.92).opacity(0.9) : .black.opacity(0.28)
+    }
+
+    private var panelStrokeColor: Color {
+        isLightAppearance ? .black.opacity(0.08) : .white.opacity(0.14)
+    }
+
+    private var cardFillColor: Color {
+        isLightAppearance ? Color(red: 0.88, green: 0.90, blue: 0.94).opacity(0.92) : .black.opacity(0.2)
+    }
+
+    private var cardStrokeColor: Color {
+        isLightAppearance ? .black.opacity(0.14) : .white.opacity(0.12)
+    }
+
+    private var dictionaryInputTextColor: NSColor {
+        isLightAppearance ? .black : .white
+    }
+
     private enum LayoutToken {
         static let sectionGap: CGFloat = 12
         static let cardPadding: CGFloat = 12
@@ -99,15 +151,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.18, green: 0.18, blue: 0.20),
-                    Color(red: 0.13, green: 0.13, blue: 0.15),
-                    Color(red: 0.20, green: 0.19, blue: 0.22)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            appBackgroundGradient
             .ignoresSafeArea()
 
             HStack(spacing: 0) {
@@ -135,7 +179,7 @@ struct ContentView: View {
                             VStack(spacing: 10) {
                                 Text("Usage History")
                                     .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.82))
+                                    .foregroundStyle(isLightAppearance ? .black.opacity(0.84) : .white.opacity(0.82))
                                     .padding(.top, 4)
                                 usageHistoryView
                             }
@@ -143,7 +187,7 @@ struct ContentView: View {
                             VStack(spacing: 10) {
                                 Text("Starred")
                                     .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(.white.opacity(0.82))
+                                    .foregroundStyle(isLightAppearance ? .black.opacity(0.84) : .white.opacity(0.82))
                                     .padding(.top, 4)
                                 starredView
                             }
@@ -168,11 +212,11 @@ struct ContentView: View {
                     }
                 )
             }
-            .background(.black.opacity(0.28))
+            .background(panelFillColor)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(.white.opacity(0.14), lineWidth: 1)
+                    .stroke(panelStrokeColor, lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.5), radius: 26, y: 14)
             .padding(.horizontal, 14)
@@ -186,7 +230,7 @@ struct ContentView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(appPreferences.themeMode.preferredColorScheme)
         .fontDesign(.rounded)
         .onChange(of: sourceText) { _, newValue in
             sourceCharCount = newValue.count
@@ -263,9 +307,12 @@ struct ContentView: View {
         } label: {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.84))
+                .foregroundStyle(isLightAppearance ? .black.opacity(0.76) : .white.opacity(0.84))
                 .frame(width: 30, height: 30)
-                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                .background(
+                    isLightAppearance ? .black.opacity(0.08) : .white.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
         }
         .buttonStyle(.plain)
     }
@@ -421,7 +468,7 @@ struct ContentView: View {
             Text("LUMINA TRANSLATE")
                 .font(.system(size: 13, weight: .semibold))
                 .kerning(1.0)
-                .foregroundStyle(.white.opacity(0.56))
+                .foregroundStyle(isLightAppearance ? .black.opacity(0.56) : .white.opacity(0.56))
                 .padding(.leading, 12)
                 .padding(.top, 22)
                 .padding(.bottom, 10)
@@ -465,9 +512,9 @@ struct ContentView: View {
             .padding(.bottom, 20)
         }
         .padding(.horizontal, 12)
-        .background(.black.opacity(0.22))
+        .background(isLightAppearance ? .white.opacity(0.62) : .black.opacity(0.22))
         .overlay(alignment: .trailing) {
-            Rectangle().fill(.white.opacity(0.04)).frame(width: 1)
+            Rectangle().fill(isLightAppearance ? .black.opacity(0.06) : .white.opacity(0.04)).frame(width: 1)
         }
     }
 
@@ -482,8 +529,17 @@ struct ContentView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(isActive ? .white.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 8))
-        .foregroundStyle(isActive ? .white : .white.opacity(0.62))
+        .background(
+            isActive
+            ? (isLightAppearance ? .black.opacity(0.08) : .white.opacity(0.12))
+            : .clear,
+            in: RoundedRectangle(cornerRadius: 8)
+        )
+        .foregroundStyle(
+            isActive
+            ? (isLightAppearance ? .black.opacity(0.86) : .white)
+            : (isLightAppearance ? .black.opacity(0.62) : .white.opacity(0.62))
+        )
     }
 
     private var dictionaryView: some View {
@@ -497,7 +553,7 @@ struct ContentView: View {
                         HStack {
                             Text(entry.term)
                                 .font(.system(size: 32, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.9) : .white)
                             Spacer()
                         }
 
@@ -510,15 +566,15 @@ struct ContentView: View {
                                         .font(.system(size: 11, weight: .semibold))
                                 }
                                 .buttonStyle(.plain)
-                                .foregroundStyle(.white.opacity(0.82))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.72) : .white.opacity(0.82))
 
                                 Text("美 \(displayPhonetic(entry.phoneticUS))")
                                     .font(.system(size: 13, design: .monospaced))
-                                    .foregroundStyle(.white.opacity(0.78))
+                                    .foregroundStyle(isLightAppearance ? .black.opacity(0.68) : .white.opacity(0.78))
                             }
                             .padding(.horizontal, LayoutToken.chipPaddingH)
                             .padding(.vertical, 6)
-                            .background(.white.opacity(0.08), in: Capsule())
+                            .background(isLightAppearance ? .black.opacity(0.06) : .white.opacity(0.08), in: Capsule())
 
                             HStack(spacing: 6) {
                                 Button {
@@ -528,18 +584,18 @@ struct ContentView: View {
                                         .font(.system(size: 11, weight: .semibold))
                                 }
                                 .buttonStyle(.plain)
-                                .foregroundStyle(.white.opacity(0.82))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.72) : .white.opacity(0.82))
 
                                 Text("英 \(displayPhonetic(entry.phoneticUK))")
                                     .font(.system(size: 13, design: .monospaced))
-                                    .foregroundStyle(.white.opacity(0.78))
+                                    .foregroundStyle(isLightAppearance ? .black.opacity(0.68) : .white.opacity(0.78))
                             }
                             .padding(.horizontal, LayoutToken.chipPaddingH)
                             .padding(.vertical, 6)
-                            .background(.white.opacity(0.08), in: Capsule())
+                            .background(isLightAppearance ? .black.opacity(0.06) : .white.opacity(0.08), in: Capsule())
                         }
 
-                        Divider().overlay(.white.opacity(0.14))
+                        Divider().overlay(isLightAppearance ? .black.opacity(0.12) : .white.opacity(0.14))
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("常用释义")
@@ -550,7 +606,7 @@ struct ContentView: View {
                                     Text("•")
                                         .foregroundStyle(.cyan.opacity(0.75))
                                     Text(definition)
-                                        .foregroundStyle(.white.opacity(0.92))
+                                        .foregroundStyle(isLightAppearance ? .black.opacity(0.86) : .white.opacity(0.92))
                                         .font(.system(size: 15))
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
@@ -559,7 +615,7 @@ struct ContentView: View {
                             if entry.definitions.count > 3 {
                                 Text("更多释义已省略，优先展示常用含义")
                                     .font(.system(size: 12))
-                                    .foregroundStyle(.white.opacity(0.82))
+                                    .foregroundStyle(isLightAppearance ? .black.opacity(0.66) : .white.opacity(0.82))
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -588,7 +644,7 @@ struct ContentView: View {
                                 ForEach(Array(entry.englishDefinitions.prefix(2)), id: \.self) { english in
                                     Text(english)
                                         .font(.system(size: 13))
-                                        .foregroundStyle(.white.opacity(0.8))
+                                        .foregroundStyle(isLightAppearance ? .black.opacity(0.84) : .white.opacity(0.8))
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
@@ -622,10 +678,10 @@ struct ContentView: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(form.label)
                                                 .font(.system(size: 11, weight: .medium))
-                                                .foregroundStyle(.white.opacity(0.58))
+                                                .foregroundStyle(isLightAppearance ? .black.opacity(0.56) : .white.opacity(0.58))
                                             Text(form.value)
                                                 .font(.system(size: 12, weight: .semibold))
-                                                .foregroundStyle(.white.opacity(0.92))
+                                                .foregroundStyle(isLightAppearance ? .black.opacity(0.9) : .white.opacity(0.92))
                                                 .lineLimit(1)
                                         }
                                         .padding(.horizontal, LayoutToken.chipPaddingH)
@@ -655,10 +711,10 @@ struct ContentView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(24)
-                    .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+                    .background(cardFillColor, in: RoundedRectangle(cornerRadius: 12))
                     .overlay {
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(.white.opacity(0.12), lineWidth: 1)
+                            .stroke(cardStrokeColor, lineWidth: 1)
                     }
                     .offset(y: dictionaryResultVisible ? 0 : 24)
                     .opacity(dictionaryResultVisible ? 1 : 0.02)
@@ -667,12 +723,12 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("No exact match in local dictionary")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(isLightAppearance ? .black.opacity(0.9) : .white)
 
                         if !dictionaryCandidates.isEmpty {
                             Text("Similar candidates:")
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.68) : .white.opacity(0.7))
 
                             ForEach(dictionaryCandidates.prefix(8), id: \.term) { candidate in
                                 Button {
@@ -682,35 +738,38 @@ struct ContentView: View {
                                 } label: {
                                     HStack {
                                         Text(candidate.term)
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(isLightAppearance ? .black.opacity(0.86) : .white)
                                         Spacer()
                                         Text(candidate.definitions.first ?? "")
                                             .lineLimit(1)
-                                            .foregroundStyle(.white.opacity(0.56))
+                                            .foregroundStyle(isLightAppearance ? .black.opacity(0.56) : .white.opacity(0.56))
                                     }
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
-                                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                                    .background(
+                                        isLightAppearance ? .black.opacity(0.07) : .white.opacity(0.08),
+                                        in: RoundedRectangle(cornerRadius: 8)
+                                    )
                                 }
                                 .buttonStyle(.plain)
                             }
                         } else {
                             Text("This word is not found in current local database.")
-                                .foregroundStyle(.white.opacity(0.8))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.8) : .white.opacity(0.8))
                             Text("Tip: import ECDICT for large vocabulary coverage:")
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.68) : .white.opacity(0.7))
                             Text("python Scripts/import_ecdict_csv.py /path/to/ecdict.csv")
                                 .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.76))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.72) : .white.opacity(0.76))
                                 .padding(.top, 2)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(24)
-                    .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+                    .background(cardFillColor, in: RoundedRectangle(cornerRadius: 12))
                     .overlay {
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(.white.opacity(0.12), lineWidth: 1)
+                            .stroke(cardStrokeColor, lineWidth: 1)
                     }
                     .offset(y: dictionaryResultVisible ? 0 : 24)
                     .opacity(dictionaryResultVisible ? 1 : 0.02)
@@ -728,11 +787,12 @@ struct ContentView: View {
     private var dictionarySearchBar: some View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(isLightAppearance ? .black.opacity(0.52) : .white.opacity(0.6))
             MacInputField(
                 text: $dictionaryQuery,
                 placeholder: "Search word or phrase in local dictionary...",
                 fontSize: 18,
+                inputTextColor: dictionaryInputTextColor,
                 autoFocus: selectedSidebarPanel == .translate && selectedSection == .dictionary,
                 onSubmit: { runDictionaryLookup() }
             )
@@ -749,7 +809,7 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.78))
+                        .foregroundStyle(isLightAppearance ? .black.opacity(0.58) : .white.opacity(0.78))
                 }
                 .buttonStyle(.plain)
                 .help("清空输入")
@@ -758,10 +818,10 @@ struct ContentView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 16)
         .frame(maxWidth: 560)
-        .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 12))
+        .background(isLightAppearance ? .white.opacity(0.8) : .black.opacity(0.22), in: RoundedRectangle(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)
-                .stroke(.white.opacity(0.12), lineWidth: 1)
+                .stroke(cardStrokeColor, lineWidth: 1)
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .onChange(of: dictionaryQuery) { _, newValue in
@@ -798,14 +858,14 @@ struct ContentView: View {
                     HStack {
                         Label("Source Text", systemImage: "text.alignleft")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(isLightAppearance ? .black.opacity(0.56) : .white.opacity(0.6))
                         Spacer()
                         Button {
                             sourceText = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 16))
-                                .foregroundStyle(.white.opacity(0.78))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.58) : .white.opacity(0.78))
                         }
                         .buttonStyle(.plain)
                         .opacity(sourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.35 : 1.0)
@@ -813,7 +873,7 @@ struct ContentView: View {
                         .help("清空源内容")
                         Text("\(sourceCharCount) / 5000")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(isLightAppearance ? .black.opacity(0.56) : .white.opacity(0.6))
                     }
                     ZStack(alignment: .topLeading) {
                         TextEditor(text: $sourceText)
@@ -821,11 +881,11 @@ struct ContentView: View {
                             .font(.system(size: 16))
                             .scrollContentBackground(.hidden)
                             .scrollIndicators(.hidden)
-                            .foregroundStyle(.white.opacity(0.9))
+                            .foregroundStyle(isLightAppearance ? .black.opacity(0.88) : .white.opacity(0.9))
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         if sourceText.isEmpty {
                             Text("Enter phrase or long text to translate...")
-                                .foregroundStyle(.white.opacity(0.32))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.32) : .white.opacity(0.32))
                                 .padding(.top, 2)
                                 .padding(.leading, 6)
                         }
@@ -837,7 +897,7 @@ struct ContentView: View {
                         } label: {
                             Image(systemName: "speaker.wave.2.circle.fill")
                                 .font(.system(size: 20))
-                                .foregroundStyle(.white.opacity(0.9))
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.7) : .white.opacity(0.9))
                         }
                         .buttonStyle(.plain)
                         .padding(.trailing, 8)
@@ -848,9 +908,9 @@ struct ContentView: View {
                     }
                 }
                 .padding(16)
-                .background(.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
+                .background(cardFillColor, in: RoundedRectangle(cornerRadius: 12))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 12).stroke(.white.opacity(0.1), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 12).stroke(cardStrokeColor, lineWidth: 1)
                 }
                 .frame(height: cardHeight)
                 .offset(y: longTextCardsVisible ? 0 : 26)
@@ -868,7 +928,7 @@ struct ContentView: View {
                         } label: {
                             Image(systemName: "doc.on.doc.fill")
                                 .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(isLightAppearance ? .black.opacity(0.82) : .white)
                                 .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
                         }
                         .buttonStyle(.plain)
@@ -883,7 +943,11 @@ struct ContentView: View {
                                 .font(.system(size: 18, weight: .medium))
                                 .lineSpacing(5)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .foregroundStyle(resultText.isEmpty ? .white.opacity(0.45) : .white.opacity(0.96))
+                                .foregroundStyle(
+                                    resultText.isEmpty
+                                    ? (isLightAppearance ? .black.opacity(0.42) : .white.opacity(0.45))
+                                    : (isLightAppearance ? .black.opacity(0.92) : .white.opacity(0.96))
+                                )
                                 .padding(.trailing, 4)
                                 .textSelection(.enabled)
                         }
@@ -902,7 +966,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "speaker.wave.2.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(.white.opacity(0.9))
+                            .foregroundStyle(isLightAppearance ? .black.opacity(0.7) : .white.opacity(0.9))
                     }
                     .buttonStyle(.plain)
                     .padding(.trailing, 10)
@@ -937,7 +1001,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("最近 14 天调用次数")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.82))
+                        .foregroundStyle(isLightAppearance ? .black.opacity(0.82) : .white.opacity(0.82))
                     Chart(dailyUsage) { item in
                         BarMark(
                             x: .value("Date", item.label),
@@ -948,16 +1012,16 @@ struct ContentView: View {
                     .frame(height: 190)
                 }
                 .padding(14)
-                .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 12))
+                .background(cardFillColor, in: RoundedRectangle(cornerRadius: 12))
                 .overlay {
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(.white.opacity(0.12), lineWidth: 1)
+                        .stroke(cardStrokeColor, lineWidth: 1)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("最近 6 个月 Token 用量")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.82))
+                        .foregroundStyle(isLightAppearance ? .black.opacity(0.82) : .white.opacity(0.82))
                     Chart(monthlyUsage) { item in
                         BarMark(
                             x: .value("Month", item.label),
@@ -968,10 +1032,10 @@ struct ContentView: View {
                     .frame(height: 210)
                 }
                 .padding(14)
-                .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 12))
+                .background(cardFillColor, in: RoundedRectangle(cornerRadius: 12))
                 .overlay {
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(.white.opacity(0.12), lineWidth: 1)
+                        .stroke(cardStrokeColor, lineWidth: 1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -982,17 +1046,17 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.62))
+                .foregroundStyle(isLightAppearance ? .black.opacity(0.62) : .white.opacity(0.62))
             Text(value)
                 .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(isLightAppearance ? .black.opacity(0.88) : .white)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+        .background(cardFillColor, in: RoundedRectangle(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)
-                .stroke(.white.opacity(0.12), lineWidth: 1)
+                .stroke(cardStrokeColor, lineWidth: 1)
         }
     }
 
@@ -1000,17 +1064,17 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Starred")
                 .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(isLightAppearance ? .black.opacity(0.88) : .white)
             Text("生词本功能正在完善中。你可以先使用 History 查看 AI 调用统计。")
-                .foregroundStyle(.white.opacity(0.76))
+                .foregroundStyle(isLightAppearance ? .black.opacity(0.68) : .white.opacity(0.76))
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(20)
-        .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+        .background(cardFillColor, in: RoundedRectangle(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)
-                .stroke(.white.opacity(0.12), lineWidth: 1)
+                .stroke(cardStrokeColor, lineWidth: 1)
         }
     }
 
@@ -1144,8 +1208,22 @@ struct ContentView: View {
 
     private var resultPanelBackground: LinearGradient {
         if lastTranslationSucceeded {
+            if isLightAppearance {
+                return LinearGradient(
+                    colors: [.purple.opacity(0.14), .pink.opacity(0.1), .black.opacity(0.1)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
             return LinearGradient(
                 colors: [.purple.opacity(0.2), .pink.opacity(0.12), .black.opacity(0.22)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        if isLightAppearance {
+            return LinearGradient(
+                colors: [.black.opacity(0.12), .black.opacity(0.1)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -1661,6 +1739,20 @@ struct ContentView: View {
                         Text(isRecordingQuickShortcut ? "正在录制：请按下组合键（需包含 Command/Option/Control/Shift）" : quickShortcutHint)
                             .font(.system(size: 12))
                             .foregroundStyle(isRecordingQuickShortcut ? .orange : .secondary)
+
+                        Divider()
+
+                        Text("主题")
+                            .font(.system(size: 14, weight: .semibold))
+                        Picker("主题", selection: $appPreferences.themeMode) {
+                            ForEach(AppThemeMode.allCases, id: \.self) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        Text("当前：\(appPreferences.themeMode.title)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
 
                         Divider()
 
